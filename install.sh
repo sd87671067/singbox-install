@@ -241,6 +241,7 @@ CONF
     CLIENT_LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp&headerType=none#${NODE_NAME}"
     
     PROTOCOL_NAME="Reality"
+    PROTOCOL_DESC="VLESS + Reality"
     print_success "Reality 配置完成"
 }
 
@@ -328,6 +329,7 @@ CONF
     
     PASSWORD_INFO="Password: ${PASSWORD}"
     PROTOCOL_NAME="ShadowTLS v3"
+    PROTOCOL_DESC="Shadowsocks + ShadowTLS v3"
     print_success "ShadowTLS v3 配置完成"
 }
 
@@ -339,6 +341,7 @@ setup_anytls() {
     echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
     echo ""
     print_warning "AnyTLS 是实验性功能，可能不稳定"
+    print_info "AnyTLS 基于 VLESS + HTTP 传输"
     echo ""
     
     UUID=$(sing-box generate uuid)
@@ -400,9 +403,11 @@ CONF
 )
     
     NODE_NAME="AnyTLS|博客:dlmn.lol"
-    CLIENT_LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&type=http&host=${TLS_SERVER}&path=%2F#${NODE_NAME}"
+    # AnyTLS 使用 VLESS + HTTP 传输
+    CLIENT_LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&type=http&host=${TLS_SERVER}&path=%2F&security=none#${NODE_NAME}"
     
     PROTOCOL_NAME="AnyTLS"
+    PROTOCOL_DESC="VLESS + HTTP 传输 (实验性)"
     print_success "AnyTLS 配置完成"
 }
 
@@ -454,6 +459,7 @@ show_result() {
     echo -e "${GREEN}${BOLD}═══════════════ 📋 服务器信息 ═══════════════${NC}"
     echo -e "  ${CYAN}🖥️  IP 地址:${NC} ${YELLOW}${SERVER_IP}${NC}"
     echo -e "  ${CYAN}🔐 协议类型:${NC} ${YELLOW}${PROTOCOL_NAME}${NC}"
+    echo -e "  ${CYAN}📝 协议说明:${NC} ${YELLOW}${PROTOCOL_DESC}${NC}"
     echo -e "  ${CYAN}🔌 监听端口:${NC} ${YELLOW}${PORT}${NC}"
     
     if [ "$PROTOCOL_NAME" = "Reality" ]; then
@@ -467,6 +473,8 @@ show_result() {
     elif [ "$PROTOCOL_NAME" = "AnyTLS" ]; then
         echo -e "  ${CYAN}🆔 UUID:${NC} ${YELLOW}${UUID}${NC}"
         echo -e "  ${CYAN}🌐 伪装域名:${NC} ${YELLOW}${TLS_SERVER}${NC}"
+        echo -e "  ${YELLOW}⚠️  注意: 链接协议显示为 vless 是正常的${NC}"
+        echo -e "  ${YELLOW}   (AnyTLS = VLESS + HTTP传输)${NC}"
     fi
     
     echo ""
@@ -477,15 +485,13 @@ show_result() {
     echo -e "${YELLOW}${CLIENT_LINK}${NC}"
     echo ""
     
-    # 生成二维码（终端显示 - 小尺寸）
+    # 生成二维码
     if command -v qrencode &> /dev/null; then
         echo -e "${CYAN}📲 终端二维码 (小尺寸，适合手机扫描):${NC}"
         echo ""
-        # 使用 -s 1 参数生成小尺寸二维码，-m 1 减小边距
         qrencode -t ANSIUTF8 -s 1 -m 1 "${CLIENT_LINK}"
         echo ""
         
-        # 同时生成 PNG 文件
         QR_FILE="/root/singbox_qr_${PROTOCOL_NAME}.png"
         qrencode -t PNG -s 6 -o "${QR_FILE}" "${CLIENT_LINK}" 2>/dev/null
         
@@ -517,6 +523,7 @@ show_result() {
 【服务器信息】
 服务器 IP: ${SERVER_IP}
 协议类型: ${PROTOCOL_NAME}
+协议说明: ${PROTOCOL_DESC}
 监听端口: ${PORT}
 
 $(if [ "$PROTOCOL_NAME" = "Reality" ]; then
@@ -534,6 +541,9 @@ elif [ "$PROTOCOL_NAME" = "AnyTLS" ]; then
     echo "【AnyTLS 配置】"
     echo "UUID: ${UUID}"
     echo "伪装域名: ${TLS_SERVER}"
+    echo ""
+    echo "注意: AnyTLS 基于 VLESS + HTTP 传输"
+    echo "客户端链接显示 vless:// 是正常的"
 fi)
 
 【客户端链接】
@@ -590,7 +600,7 @@ main_menu() {
     echo -e "     ${CYAN}└─${NC} 适合高速传输场景"
     echo ""
     echo -e "  ${GREEN}${BOLD}3${NC}) ${BOLD}AnyTLS${NC} ${YELLOW}(实验性)${NC}"
-    echo -e "     ${CYAN}├─${NC} 实验性功能"
+    echo -e "     ${CYAN}├─${NC} 基于 VLESS + HTTP 传输"
     echo -e "     ${CYAN}├─${NC} 灵活的传输方式"
     echo -e "     ${CYAN}└─${NC} ${YELLOW}可能不稳定${NC}"
     echo ""
