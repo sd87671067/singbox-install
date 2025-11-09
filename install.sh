@@ -2,8 +2,8 @@
 
 # Sing-Box 一键安装配置脚本 v2.3
 # 作者: sd87671067
-# 博客: https://dlmn.lol
-# 更新时间: 2025-11-09 09:05 UTC
+# 博客: dlmn.lol
+# 更新时间: 2025-11-09 09:18 UTC
 
 set -e
 
@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 NC='\033[0m'
 
-AUTHOR_BLOG="https://dlmn.lol"
+AUTHOR_BLOG="dlmn.lol"
 CONFIG_FILE="/etc/sing-box/config.json"
 INSTALL_DIR="/usr/local/bin"
 CERT_DIR="/etc/sing-box/certs"
@@ -96,8 +96,8 @@ gen_cert() {
     mkdir -p ${CERT_DIR}
     openssl genrsa -out ${CERT_DIR}/private.key 2048 2>/dev/null
     openssl req -new -x509 -days 36500 -key ${CERT_DIR}/private.key -out ${CERT_DIR}/cert.pem \
-        -subj "/C=US/ST=Washington/L=Redmond/O=Microsoft Corporation/CN=bing.com" 2>/dev/null
-    print_success "证书生成完成（bing.com，有效期100年）"
+        -subj "/C=US/ST=California/L=Cupertino/O=Apple Inc./CN=itunes.apple.com" 2>/dev/null
+    print_success "证书生成完成（itunes.apple.com，有效期100年）"
 }
 
 gen_keys() {
@@ -150,8 +150,7 @@ setup_reality() {
   }
 }'
     
-    local node_name="Reality 博客:${AUTHOR_BLOG}"
-    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${REALITY_PUBLIC}&sid=${SHORT_ID}&type=tcp#${node_name// /%20}"
+    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${REALITY_PUBLIC}&sid=${SHORT_ID}&type=tcp#reality-博客域名:${AUTHOR_BLOG}"
     PROTO="Reality"
     EXTRA_INFO="UUID: ${UUID}\nPublic Key: ${REALITY_PUBLIC}\nShort ID: ${SHORT_ID}\nSNI: ${SNI}"
     print_success "Reality 配置完成"
@@ -181,10 +180,9 @@ setup_hysteria2() {
   }
 }'
     
-    local node_name="Hysteria2 博客:${AUTHOR_BLOG}"
-    LINK="hysteria2://${HY2_PASSWORD}@${SERVER_IP}:${PORT}?insecure=1&sni=bing.com#${node_name// /%20}"
+    LINK="hysteria2://${HY2_PASSWORD}@${SERVER_IP}:${PORT}?insecure=1&sni=itunes.apple.com#hysteria2-博客域名:${AUTHOR_BLOG}"
     PROTO="Hysteria2"
-    EXTRA_INFO="密码: ${HY2_PASSWORD}\n证书: 自签证书(bing.com)"
+    EXTRA_INFO="密码: ${HY2_PASSWORD}\n证书: 自签证书(itunes.apple.com)"
     print_success "Hysteria2 配置完成"
 }
 
@@ -197,8 +195,6 @@ setup_socks5() {
     
     print_info "生成配置文件..."
     
-    local node_name="SOCKS5 博客:${AUTHOR_BLOG}"
-    
     if [[ "$ENABLE_AUTH" =~ ^[Yy]$ ]]; then
         INBOUND_JSON='{
   "type": "socks",
@@ -208,7 +204,7 @@ setup_socks5() {
   "users": [{"username": "'${SOCKS_USER}'", "password": "'${SOCKS_PASS}'"}],
   "udp": true
 }'
-        LINK="socks5://${SOCKS_USER}:${SOCKS_PASS}@${SERVER_IP}:${PORT}#${node_name// /%20}"
+        LINK="socks5://${SOCKS_USER}:${SOCKS_PASS}@${SERVER_IP}:${PORT}#socks5-博客域名:${AUTHOR_BLOG}"
         EXTRA_INFO="用户名: ${SOCKS_USER}\n密码: ${SOCKS_PASS}"
     else
         INBOUND_JSON='{
@@ -218,7 +214,7 @@ setup_socks5() {
   "listen_port": '${PORT}',
   "udp": true
 }'
-        LINK="socks5://${SERVER_IP}:${PORT}#${node_name// /%20}"
+        LINK="socks5://${SERVER_IP}:${PORT}#socks5-博客域名:${AUTHOR_BLOG}"
         EXTRA_INFO="无认证"
     fi
     
@@ -260,15 +256,13 @@ setup_shadowtls() {
 }'
     
     # Shadowrocket ShadowTLS v3 格式
-    # ss://base64(method:password)@server:port?shadow-tls=base64(json)#name
     local ss_userinfo=$(echo -n "2022-blake3-aes-128-gcm:${SS_PASSWORD}" | base64 -w0)
     
     # 构建 JSON 插件参数
     local plugin_json="{\"version\":\"3\",\"host\":\"${SNI}\",\"password\":\"${SHADOWTLS_PASSWORD}\"}"
     local plugin_base64=$(echo -n "$plugin_json" | base64 -w0)
     
-    local node_name="ShadowTLS 博客:${AUTHOR_BLOG}"
-    LINK="ss://${ss_userinfo}@${SERVER_IP}:${PORT}?shadow-tls=${plugin_base64}#${node_name// /%20}"
+    LINK="ss://${ss_userinfo}@${SERVER_IP}:${PORT}?shadow-tls=${plugin_base64}#shadowtls-博客域名:${AUTHOR_BLOG}"
     
     PROTO="ShadowTLS v3"
     EXTRA_INFO="Shadowsocks方法: 2022-blake3-aes-128-gcm\nShadowsocks密码: ${SS_PASSWORD}\nShadowTLS密码: ${SHADOWTLS_PASSWORD}\n伪装域名: ${SNI}\n\n说明: 可直接复制链接导入 Shadowrocket"
@@ -293,16 +287,15 @@ setup_https() {
   "users": [{"uuid": "'${UUID}'"}],
   "tls": {
     "enabled": true,
-    "server_name": "bing.com",
+    "server_name": "itunes.apple.com",
     "certificate_path": "'${CERT_DIR}'/cert.pem",
     "key_path": "'${CERT_DIR}'/private.key"
   }
 }'
     
-    local node_name="HTTPS 博客:${AUTHOR_BLOG}"
-    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=tls&sni=bing.com&type=tcp&allowInsecure=1#${node_name// /%20}"
+    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=tls&sni=itunes.apple.com&type=tcp&allowInsecure=1#https-博客域名:${AUTHOR_BLOG}"
     PROTO="HTTPS"
-    EXTRA_INFO="UUID: ${UUID}\n证书: 自签证书(bing.com)"
+    EXTRA_INFO="UUID: ${UUID}\n证书: 自签证书(itunes.apple.com)"
     print_success "HTTPS 配置完成"
 }
 
@@ -316,7 +309,7 @@ setup_anytls() {
     
     print_info "生成配置文件..."
     
-    # 正确的 AnyTLS 配置（使用 anytls 类型）
+    # 正确的 AnyTLS 配置
     INBOUND_JSON='{
   "type": "anytls",
   "tag": "anytls-in",
@@ -331,11 +324,10 @@ setup_anytls() {
   }
 }'
     
-    # AnyTLS 没有标准的 URI 格式，提供配置信息
-    local node_name="AnyTLS 博客:${AUTHOR_BLOG}"
-    LINK="手动配置:\n服务器: ${SERVER_IP}\n端口: ${PORT}\n密码: ${ANYTLS_PASSWORD}\n证书: 自签证书(bing.com)\nTLS: 启用"
+    # AnyTLS 没有标准的 URI 格式
+    LINK="手动配置:\n服务器: ${SERVER_IP}\n端口: ${PORT}\n密码: ${ANYTLS_PASSWORD}\n证书: 自签证书(itunes.apple.com)\nTLS: 启用"
     PROTO="AnyTLS"
-    EXTRA_INFO="密码: ${ANYTLS_PASSWORD}\n证书: 自签证书(bing.com)\n\n说明: AnyTLS 需要手动配置，暂无标准剪贴板格式"
+    EXTRA_INFO="密码: ${ANYTLS_PASSWORD}\n证书: 自签证书(itunes.apple.com)\n\n说明: AnyTLS 需要手动配置，暂无标准剪贴板格式"
     print_success "AnyTLS 配置完成"
 }
 
@@ -607,7 +599,7 @@ show_result() {
     echo -e "  日志: ${CYAN}journalctl -u sing-box -f${NC}"
     echo -e "  重启: ${CYAN}systemctl restart sing-box${NC}"
     echo ""
-    echo -e "${GREEN}💡 更多教程: ${YELLOW}${AUTHOR_BLOG}${NC}"
+    echo -e "${GREEN}💡 更多教程: ${YELLOW}https://${AUTHOR_BLOG}${NC}"
     echo -e "${GREEN}📧 作者: ${YELLOW}sd87671067${NC}"
     echo ""
 }
