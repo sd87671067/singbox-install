@@ -1,10 +1,11 @@
 #!/bin/bash
 
+# ==========================================
 # SingBox 一键安装配置脚本
-# 支持 Reality / ShadowTLS v3 / AnyTLS
 # 作者: sd87671067
-# 网站: dlmn.lol
-# 日期: 2025-11-09
+# 博客: https://dlmn.lol
+# 支持: Reality / ShadowTLS v3 / AnyTLS
+# ==========================================
 
 set -e
 
@@ -15,24 +16,32 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 # 打印函数
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+print_error() { echo -e "${RED}[✗]${NC} $1"; }
 
 # 显示 Banner
 show_banner() {
     clear
-    echo -e "${CYAN}"
-    echo "╔════════════════════════════════════════╗"
-    echo "║     SingBox 一键安装配置脚本           ║"
-    echo "║     作者: sd87671067                   ║"
-    echo "║     网站: ${PURPLE}dlmn.lol${CYAN}                      ║"
-    echo "║     支持: Reality/ShadowTLS/AnyTLS     ║"
-    echo "╚════════════════════════════════════════╝"
+    echo -e "${CYAN}${BOLD}"
+    echo "╔════════════════════════════════════════════════╗"
+    echo "║                                                ║"
+    echo "║       SingBox 一键安装配置脚本 v1.0           ║"
+    echo "║                                                ║"
+    echo "║       作者: ${PURPLE}sd87671067${CYAN}                        ║"
+    echo "║       博客: ${PURPLE}https://dlmn.lol${CYAN}                 ║"
+    echo "║                                                ║"
+    echo "║       支持协议:                                ║"
+    echo "║       • Reality (最安全推荐)                   ║"
+    echo "║       • ShadowTLS v3 (高性能)                  ║"
+    echo "║       • AnyTLS (实验性)                        ║"
+    echo "║                                                ║"
+    echo "╚════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo ""
 }
@@ -69,13 +78,11 @@ install_dependencies() {
     print_info "安装必要依赖..."
     apt install -y curl wget tar gzip qrencode > /dev/null 2>&1
 
-    # 检查 sing-box 是否已安装
     if command -v sing-box &> /dev/null; then
         print_success "sing-box 已安装"
         return
     fi
 
-    # 安装 sing-box
     print_info "安装 sing-box..."
     
     ARCH=$(dpkg --print-architecture)
@@ -95,7 +102,6 @@ install_dependencies() {
     cp /tmp/sing-box-${LATEST_VERSION}-linux-${ARCH}/sing-box /usr/local/bin/
     chmod +x /usr/local/bin/sing-box
     
-    # 创建 systemd 服务
     cat > /etc/systemd/system/sing-box.service <<SERVICE
 [Unit]
 Description=sing-box service
@@ -131,24 +137,32 @@ get_server_ip() {
 
 # Reality 配置
 setup_reality() {
-    print_info "配置 Reality 协议..."
+    clear
+    echo -e "${CYAN}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}  ${BOLD}Reality 协议配置${NC}                              ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
+    echo ""
+    print_info "Reality 是目前最安全的代理协议，基于真实 TLS 指纹"
+    echo ""
     
     UUID=$(sing-box generate uuid)
     KEYPAIR=$(sing-box generate reality-keypair)
     PRIVATE_KEY=$(echo "$KEYPAIR" | grep "PrivateKey" | awk '{print $2}')
     PUBLIC_KEY=$(echo "$KEYPAIR" | grep "PublicKey" | awk '{print $2}')
     
-    read -p "请输入监听端口 (默认: 443): " PORT
+    read -p "$(echo -e ${YELLOW}请输入监听端口 [默认: 443]: ${NC})" PORT
     PORT=${PORT:-443}
     
     echo ""
-    echo "请选择伪装域名:"
-    echo "1) www.microsoft.com"
-    echo "2) itunes.apple.com"
-    echo "3) www.lovelive-anime.jp"
-    echo "4) gateway.icloud.com"
-    echo "5) 自定义"
-    read -p "请选择 (默认: 2): " SNI_CHOICE
+    echo -e "${CYAN}═══════════ 选择伪装域名 ═══════════${NC}"
+    echo ""
+    echo -e "  ${GREEN}1${NC}) www.microsoft.com    ${CYAN}(微软官网)${NC}"
+    echo -e "  ${GREEN}2${NC}) itunes.apple.com     ${CYAN}(苹果 iTunes - 推荐)${NC}"
+    echo -e "  ${GREEN}3${NC}) www.lovelive-anime.jp ${CYAN}(日本动漫网站)${NC}"
+    echo -e "  ${GREEN}4${NC}) gateway.icloud.com   ${CYAN}(苹果 iCloud)${NC}"
+    echo -e "  ${GREEN}5${NC}) 自定义域名"
+    echo ""
+    read -p "$(echo -e ${YELLOW}请选择伪装域名 [默认: 2]: ${NC})" SNI_CHOICE
     SNI_CHOICE=${SNI_CHOICE:-2}
     
     case $SNI_CHOICE in
@@ -156,7 +170,9 @@ setup_reality() {
         2) SNI="itunes.apple.com" ;;
         3) SNI="www.lovelive-anime.jp" ;;
         4) SNI="gateway.icloud.com" ;;
-        5) read -p "请输入域名: " SNI ;;
+        5) 
+            read -p "$(echo -e ${YELLOW}请输入自定义域名: ${NC})" SNI
+            ;;
         *) SNI="itunes.apple.com" ;;
     esac
     
@@ -221,22 +237,29 @@ setup_reality() {
 CONF
 )
     
-    NODE_NAME="Reality-${SERVER_IP}|dlmn.lol"
+    NODE_NAME="Reality|博客:dlmn.lol"
     CLIENT_LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp&headerType=none#${NODE_NAME}"
     
     PROTOCOL_NAME="Reality"
+    print_success "Reality 配置完成"
 }
 
 # ShadowTLS v3 配置
 setup_shadowtls() {
-    print_info "配置 ShadowTLS v3 协议..."
+    clear
+    echo -e "${CYAN}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}  ${BOLD}ShadowTLS v3 协议配置${NC}                         ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
+    echo ""
+    print_info "ShadowTLS v3 是高性能的 TLS 伪装协议"
+    echo ""
     
     PASSWORD=$(openssl rand -base64 32)
     
-    read -p "请输入监听端口 (默认: 443): " PORT
+    read -p "$(echo -e ${YELLOW}请输入监听端口 [默认: 443]: ${NC})" PORT
     PORT=${PORT:-443}
     
-    read -p "请输入伪装域名 (默认: cloud.tencent.com): " HANDSHAKE_SERVER
+    read -p "$(echo -e ${YELLOW}请输入伪装域名 [默认: cloud.tencent.com]: ${NC})" HANDSHAKE_SERVER
     HANDSHAKE_SERVER=${HANDSHAKE_SERVER:-cloud.tencent.com}
     
     CONFIG=$(cat <<CONF
@@ -299,25 +322,31 @@ setup_shadowtls() {
 CONF
 )
     
-    NODE_NAME="ShadowTLS-${SERVER_IP}|dlmn.lol"
+    NODE_NAME="ShadowTLS|博客:dlmn.lol"
     SS_LINK=$(echo -n "2022-blake3-aes-128-gcm:${PASSWORD}" | base64 -w 0)
     CLIENT_LINK="ss://${SS_LINK}@${SERVER_IP}:${PORT}?plugin=shadow-tls;version=3;host=${HANDSHAKE_SERVER}#${NODE_NAME}"
     
     PASSWORD_INFO="Password: ${PASSWORD}"
     PROTOCOL_NAME="ShadowTLS v3"
+    print_success "ShadowTLS v3 配置完成"
 }
 
 # AnyTLS 配置
 setup_anytls() {
-    print_info "配置 AnyTLS 协议..."
-    print_warning "注意: AnyTLS 是实验性功能"
+    clear
+    echo -e "${CYAN}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}  ${BOLD}AnyTLS 协议配置 (实验性)${NC}                      ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
+    echo ""
+    print_warning "AnyTLS 是实验性功能，可能不稳定"
+    echo ""
     
     UUID=$(sing-box generate uuid)
     
-    read -p "请输入监听端口 (默认: 443): " PORT
+    read -p "$(echo -e ${YELLOW}请输入监听端口 [默认: 443]: ${NC})" PORT
     PORT=${PORT:-443}
     
-    read -p "请输入伪装域名 (默认: www.bing.com): " TLS_SERVER
+    read -p "$(echo -e ${YELLOW}请输入伪装域名 [默认: www.bing.com]: ${NC})" TLS_SERVER
     TLS_SERVER=${TLS_SERVER:-www.bing.com}
     
     CONFIG=$(cat <<CONF
@@ -370,10 +399,11 @@ setup_anytls() {
 CONF
 )
     
-    NODE_NAME="AnyTLS-${SERVER_IP}|dlmn.lol"
+    NODE_NAME="AnyTLS|博客:dlmn.lol"
     CLIENT_LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&type=http&host=${TLS_SERVER}&path=%2F#${NODE_NAME}"
     
     PROTOCOL_NAME="AnyTLS"
+    print_success "AnyTLS 配置完成"
 }
 
 # 保存配置
@@ -412,54 +442,75 @@ setup_firewall() {
 show_result() {
     clear
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════╗"
-    echo -e "║         SingBox 安装完成 ✓             ║"
-    echo -e "║       更多工具访问: ${PURPLE}dlmn.lol${CYAN}          ║"
-    echo -e "╚════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}${BOLD}║                                                       ║${NC}"
+    echo -e "${CYAN}${BOLD}║              🎉 SingBox 安装完成 ✓                   ║${NC}"
+    echo -e "${CYAN}${BOLD}║                                                       ║${NC}"
+    echo -e "${CYAN}${BOLD}║          更多工具访问: ${PURPLE}https://dlmn.lol${CYAN}            ║${NC}"
+    echo -e "${CYAN}${BOLD}║          作者博客: ${PURPLE}sd87671067${CYAN}                      ║${NC}"
+    echo -e "${CYAN}${BOLD}║                                                       ║${NC}"
+    echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${GREEN}═══════════════ 服务器信息 ═══════════════${NC}"
-    echo -e "  🖥️  IP 地址: ${YELLOW}${SERVER_IP}${NC}"
-    echo -e "  🔐 协议类型: ${YELLOW}${PROTOCOL_NAME}${NC}"
-    echo -e "  🔌 监听端口: ${YELLOW}${PORT}${NC}"
+    echo -e "${GREEN}${BOLD}═══════════════ 📋 服务器信息 ═══════════════${NC}"
+    echo -e "  ${CYAN}🖥️  IP 地址:${NC} ${YELLOW}${SERVER_IP}${NC}"
+    echo -e "  ${CYAN}🔐 协议类型:${NC} ${YELLOW}${PROTOCOL_NAME}${NC}"
+    echo -e "  ${CYAN}🔌 监听端口:${NC} ${YELLOW}${PORT}${NC}"
     
     if [ "$PROTOCOL_NAME" = "Reality" ]; then
-        echo -e "  🆔 UUID: ${YELLOW}${UUID}${NC}"
-        echo -e "  🔑 公钥: ${YELLOW}${PUBLIC_KEY}${NC}"
-        echo -e "  🎯 Short ID: ${YELLOW}${SHORT_ID}${NC}"
-        echo -e "  🌐 SNI: ${YELLOW}${SNI}${NC}"
+        echo -e "  ${CYAN}🆔 UUID:${NC} ${YELLOW}${UUID}${NC}"
+        echo -e "  ${CYAN}🔑 公钥:${NC} ${YELLOW}${PUBLIC_KEY}${NC}"
+        echo -e "  ${CYAN}🎯 Short ID:${NC} ${YELLOW}${SHORT_ID}${NC}"
+        echo -e "  ${CYAN}🌐 SNI:${NC} ${YELLOW}${SNI}${NC}"
     elif [ "$PROTOCOL_NAME" = "ShadowTLS v3" ]; then
-        echo -e "  🔒 ${YELLOW}${PASSWORD_INFO}${NC}"
-        echo -e "  🌐 伪装域名: ${YELLOW}${HANDSHAKE_SERVER}${NC}"
+        echo -e "  ${CYAN}🔒 ${YELLOW}${PASSWORD_INFO}${NC}"
+        echo -e "  ${CYAN}🌐 伪装域名:${NC} ${YELLOW}${HANDSHAKE_SERVER}${NC}"
     elif [ "$PROTOCOL_NAME" = "AnyTLS" ]; then
-        echo -e "  🆔 UUID: ${YELLOW}${UUID}${NC}"
-        echo -e "  🌐 伪装域名: ${YELLOW}${TLS_SERVER}${NC}"
+        echo -e "  ${CYAN}🆔 UUID:${NC} ${YELLOW}${UUID}${NC}"
+        echo -e "  ${CYAN}🌐 伪装域名:${NC} ${YELLOW}${TLS_SERVER}${NC}"
     fi
     
     echo ""
-    echo -e "${GREEN}═══════════════ 客户端配置 ═══════════════${NC}"
-    echo -e "${CYAN}📱 复制以下链接到 v2rayN 导入:${NC}"
+    echo -e "${GREEN}${BOLD}═══════════════ 📱 客户端配置 ═══════════════${NC}"
+    echo -e "${CYAN}复制以下链接到 v2rayN 导入:${NC}"
+    echo -e "${PURPLE}节点备注: ${PROTOCOL_NAME}|博客:dlmn.lol${NC}"
     echo ""
     echo -e "${YELLOW}${CLIENT_LINK}${NC}"
     echo ""
     
+    # 生成二维码（终端显示 - 小尺寸）
     if command -v qrencode &> /dev/null; then
-        echo -e "${CYAN}📲 扫描二维码导入:${NC}"
-        qrencode -t ANSIUTF8 "${CLIENT_LINK}"
+        echo -e "${CYAN}📲 终端二维码 (小尺寸，适合手机扫描):${NC}"
+        echo ""
+        # 使用 -s 1 参数生成小尺寸二维码，-m 1 减小边距
+        qrencode -t ANSIUTF8 -s 1 -m 1 "${CLIENT_LINK}"
+        echo ""
+        
+        # 同时生成 PNG 文件
+        QR_FILE="/root/singbox_qr_${PROTOCOL_NAME}.png"
+        qrencode -t PNG -s 6 -o "${QR_FILE}" "${CLIENT_LINK}" 2>/dev/null
+        
+        if [ -f "${QR_FILE}" ]; then
+            print_success "二维码图片已保存: ${QR_FILE}"
+            echo -e "  ${CYAN}提示: 可以使用 scp 下载到本地扫描${NC}"
+            echo -e "  ${YELLOW}scp root@${SERVER_IP}:${QR_FILE} ./${NC}"
+        fi
         echo ""
     fi
     
-    echo -e "${GREEN}═══════════════ 管理命令 ═══════════════${NC}"
-    echo -e "  查看状态: ${CYAN}systemctl status sing-box${NC}"
-    echo -e "  查看日志: ${CYAN}journalctl -u sing-box -f${NC}"
-    echo -e "  重启服务: ${CYAN}systemctl restart sing-box${NC}"
-    echo -e "  停止服务: ${CYAN}systemctl stop sing-box${NC}"
+    echo -e "${GREEN}${BOLD}═══════════════ ⚙️  管理命令 ═══════════════${NC}"
+    echo -e "  ${CYAN}查看状态:${NC} systemctl status sing-box"
+    echo -e "  ${CYAN}查看日志:${NC} journalctl -u sing-box -f"
+    echo -e "  ${CYAN}重启服务:${NC} systemctl restart sing-box"
+    echo -e "  ${CYAN}停止服务:${NC} systemctl stop sing-box"
+    echo -e "  ${CYAN}查看配置:${NC} cat /root/singbox_config.txt"
     echo ""
     
     cat > /root/singbox_config.txt <<INFO
 ════════════════════════════════════════════════════
          SingBox 配置信息
+         
          脚本作者: sd87671067
-         官方网站: dlmn.lol
+         作者博客: https://dlmn.lol
          生成时间: $(date)
 ════════════════════════════════════════════════════
 
@@ -488,6 +539,15 @@ fi)
 【客户端链接】
 ${CLIENT_LINK}
 
+【节点备注】
+格式: ${PROTOCOL_NAME}|博客:dlmn.lol
+说明: 导入v2rayN后，节点名称会显示此备注
+
+【二维码文件】
+终端查看: 已显示在安装完成界面
+PNG 文件: ${QR_FILE}
+下载命令: scp root@${SERVER_IP}:${QR_FILE} ./
+
 【配置文件位置】
 /etc/sing-box/config.json
 
@@ -499,41 +559,72 @@ ${CLIENT_LINK}
 重启服务: systemctl restart sing-box
 
 ════════════════════════════════════════════════════
-更多代理工具和教程，请访问: https://dlmn.lol
+更多代理工具和教程，请访问作者博客:
+👉 https://dlmn.lol
 ════════════════════════════════════════════════════
 INFO
     
     print_success "配置信息已保存到: /root/singbox_config.txt"
     echo ""
-    echo -e "${PURPLE}════════════════════════════════════════════════════${NC}"
-    echo -e "${PURPLE}   💡 更多工具和教程，请访问: ${CYAN}https://dlmn.lol${NC}"
-    echo -e "${PURPLE}════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}${BOLD}══════════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}${BOLD}   💡 更多工具和教程，请访问作者博客: ${CYAN}https://dlmn.lol${NC}"
+    echo -e "${PURPLE}${BOLD}   📧 作者: sd87671067${NC}"
+    echo -e "${PURPLE}${BOLD}══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
 # 主菜单
 main_menu() {
     show_banner
-    echo "请选择要安装的协议:"
+    echo -e "${CYAN}${BOLD}═══════════════ 请选择代理协议 ═══════════════${NC}"
     echo ""
-    echo "  ${GREEN}1)${NC} Reality ${CYAN}(推荐 - 最安全)${NC}"
-    echo "  ${GREEN}2)${NC} ShadowTLS v3 ${CYAN}(高性能)${NC}"
-    echo "  ${GREEN}3)${NC} AnyTLS ${YELLOW}(实验性)${NC}"
-    echo "  ${RED}0)${NC} 退出脚本"
+    echo -e "  ${GREEN}${BOLD}1${NC}) ${BOLD}Reality${NC}"
+    echo -e "     ${CYAN}├─${NC} 最新、最安全的代理协议"
+    echo -e "     ${CYAN}├─${NC} 基于真实 TLS 指纹伪装"
+    echo -e "     ${CYAN}├─${NC} 抗审查能力极强"
+    echo -e "     ${CYAN}└─${NC} ${GREEN}★ 强烈推荐 ★${NC}"
     echo ""
-    read -p "请输入选项 [1-3]: " choice
+    echo -e "  ${GREEN}${BOLD}2${NC}) ${BOLD}ShadowTLS v3${NC}"
+    echo -e "     ${CYAN}├─${NC} 高性能 TLS 伪装协议"
+    echo -e "     ${CYAN}├─${NC} 伪装成正常 HTTPS 流量"
+    echo -e "     ${CYAN}└─${NC} 适合高速传输场景"
+    echo ""
+    echo -e "  ${GREEN}${BOLD}3${NC}) ${BOLD}AnyTLS${NC} ${YELLOW}(实验性)${NC}"
+    echo -e "     ${CYAN}├─${NC} 实验性功能"
+    echo -e "     ${CYAN}├─${NC} 灵活的传输方式"
+    echo -e "     ${CYAN}└─${NC} ${YELLOW}可能不稳定${NC}"
+    echo ""
+    echo -e "  ${RED}${BOLD}0${NC}) ${BOLD}退出脚本${NC}"
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════${NC}"
+    echo ""
+    read -p "$(echo -e ${YELLOW}${BOLD}请输入选项 [1-3]: ${NC})" choice
     
     case $choice in
-        1) setup_reality ;;
-        2) setup_shadowtls ;;
-        3) setup_anytls ;;
+        1) 
+            PROTOCOL_TYPE="Reality"
+            setup_reality 
+            ;;
+        2) 
+            PROTOCOL_TYPE="ShadowTLS v3"
+            setup_shadowtls 
+            ;;
+        3) 
+            PROTOCOL_TYPE="AnyTLS"
+            setup_anytls 
+            ;;
         0) 
-            echo -e "${CYAN}感谢使用！访问 dlmn.lol 获取更多工具${NC}"
+            echo ""
+            echo -e "${CYAN}感谢使用！"
+            echo -e "更多工具请访问: ${PURPLE}https://dlmn.lol${NC}"
+            echo -e "作者: ${PURPLE}sd87671067${NC}"
+            echo ""
             exit 0 
             ;;
         *) 
-            print_error "无效选择"
-            exit 1
+            print_error "无效选择，请输入 1-3"
+            sleep 2
+            main_menu
             ;;
     esac
 }
