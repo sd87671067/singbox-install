@@ -4,6 +4,8 @@
 # SingBox 一键安装配置脚本
 # 作者: sd87671067
 # 博客: https://dlmn.lol
+# 支持: Reality / Hysteria2 / ShadowTLS / Reality+gRPC / SOCKS5
+# 中转: VLESS / SS2022 / SOCKS / HTTP / HTTPS
 # ==========================================
 
 set -e
@@ -26,13 +28,12 @@ show_banner() {
     clear
     echo -e "${CYAN}${BOLD}"
     echo "╔════════════════════════════════════════════════╗"
-    echo "║       SingBox 一键安装脚本 v1.3               ║"
+    echo "║       SingBox 一键安装脚本 v1.4               ║"
     echo "║       作者: sd87671067                         ║"
     echo "║       博客: https://dlmn.lol                   ║"
     echo "║                                                ║"
-    echo "║  1) Reality      2) Hysteria2                  ║"
-    echo "║  3) ShadowTLS    4) Reality+gRPC               ║"
-    echo "║  5) SOCKS5                                     ║"
+    echo "║  协议: Reality | Hysteria2 | ShadowTLS        ║"
+    echo "║  中转: VLESS | SS2022 | SOCKS | HTTP          ║"
     echo "╚════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -49,7 +50,7 @@ detect_os() {
 install_dependencies() {
     print_info "安装依赖..."
     apt update -y > /dev/null 2>&1
-    apt install -y curl wget tar gzip qrencode openssl jq > /dev/null 2>&1
+    apt install -y curl wget tar gzip qrencode openssl jq coreutils > /dev/null 2>&1
 
     if command -v sing-box &> /dev/null; then
         print_success "sing-box 已安装"
@@ -306,6 +307,14 @@ setup_relay_outbound() {
     echo ""
     echo -e "${CYAN}═══ 中转出站配置 ═══${NC}"
     echo ""
+    echo "支持格式:"
+    echo "  • vless://..."
+    echo "  • ss://...           (SS2022)"
+    echo "  • socks://user:pass@ip:port"
+    echo "  • http://user:pass@ip:port"
+    echo "  • https://user:pass@ip:port"
+    echo "  • Shadowsocket Reality 格式"
+    echo ""
     read -p "是否配置中转? [y/N]: " USE_RELAY
     
     if [[ ! "${USE_RELAY}" =~ ^[Yy]$ ]]; then
@@ -316,23 +325,25 @@ setup_relay_outbound() {
     fi
     
     echo ""
-    print_info "请粘贴分享链接"
-    print_warning "支持: 标准 vless:// 或 Shadowsocket 格式"
-    echo ""
-    read -p "粘贴链接: " SHARE_LINK
+    read -p "粘贴中转链接: " SHARE_LINK
     
     if [ -z "$SHARE_LINK" ]; then
         OUTBOUND_JSON='{"type": "direct", "tag": "direct"}'
         OUTBOUND_TAG="direct"
+        print_warning "链接为空，使用直连"
         return
     fi
     
-    # 检测链接格式
+    # 检测链接类型
     if [[ "$SHARE_LINK" =~ ^vless:// ]]; then
-        # 标准 VLESS 格式
         parse_vless_link "$SHARE_LINK"
-    elif [[ "$SHARE_LINK" =~ [A-Za-z0-9+/=]{30,}\? ]]; then
-        # Shadowsocket Reality 格式 (Base64@IP:PORT?params)
+    elif [[ "$SHARE_LINK" =~ ^ss:// ]]; then
+        parse_ss_link "$SHARE_LINK"
+    elif [[ "$SHARE_LINK" =~ ^socks5?:// ]]; then
+        parse_socks_link "$SHARE_LINK"
+    elif [[ "$SHARE_LINK" =~ ^https?:// ]]; then
+        parse_http_link "$SHARE_LINK"
+    elif [[ "$SHARE_LINK" =~ [A-Za-z0-9+/=]{30,}@.+:[0-9]+\? ]]; then
         parse_shadowsocket_link "$SHARE_LINK"
     else
         print_warning "无法识别格式，使用直连"
@@ -341,30 +352,22 @@ setup_relay_outbound() {
     fi
 }
 
-# 解析 Shadowsocket 格式
+# 解析 Shadowsocket Reality 格式
 parse_shadowsocket_link() {
     local link="$1"
+    print_info "解析 Shadowsocket Reality 格式..."
     
-    # 提取 Base64 部分 (UUID)
     local uuid_b64=$(echo "$link" | cut -d'@' -f1)
     local uuid=$(echo "$uuid_b64" | base64 -d 2>/dev/null | cut -d':' -f2)
     
-    # 提取服务器和端口
     local server_port=$(echo "$link" | cut -d'@' -f2 | cut -d'?' -f1)
     local server=$(echo "$server_port" | cut -d':' -f1)
     local port=$(echo "$server_port" | cut -d':' -f2)
     
-    # 提取参数
     local params=$(echo "$link" | cut -d'?' -f2)
     local sni=$(echo "$params" | grep -oP 'peer=\K[^&]+' || echo "")
     local pbk=$(echo "$params" | grep -oP 'pbk=\K[^&]+' || echo "")
     local sid=$(echo "$params" | grep -oP 'sid=\K[^&]+' || echo "")
-    local flow="xtls-rprx-vision"
-    
-    # 检测是否有 xtls 参数
-    if echo "$params" | grep -q "xtls="; then
-        flow="xtls-rprx-vision"
-    fi
     
     OUTBOUND_TAG="relay"
     OUTBOUND_JSON='{
@@ -373,7 +376,7 @@ parse_shadowsocket_link() {
             "server": "'${server}'",
             "server_port": '${port}',
             "uuid": "'${uuid}'",
-            "flow": "'${flow}'",
+            "flow": "xtls-rprx-vision",
             "tls": {
                 "enabled": true,
                 "server_name": "'${sni}'",
@@ -386,14 +389,15 @@ parse_shadowsocket_link() {
             }
         }'
     
-    print_success "已解析 Shadowsocket Reality 配置"
+    print_success "Shadowsocket Reality 解析成功"
 }
 
 # 解析标准 VLESS 链接
 parse_vless_link() {
     local link="$1"
-    local data=$(echo "$link" | sed 's/vless:\/\///')
+    print_info "解析 VLESS 链接..."
     
+    local data=$(echo "$link" | sed 's/vless:\/\///')
     local uuid=$(echo "$data" | cut -d'@' -f1)
     local rest=$(echo "$data" | cut -d'@' -f2)
     local server=$(echo "$rest" | cut -d':' -f1)
@@ -428,6 +432,7 @@ parse_vless_link() {
                 }
             }
         }'
+        print_success "VLESS Reality 解析成功"
     else
         OUTBOUND_JSON='{
             "type": "vless",
@@ -436,9 +441,127 @@ parse_vless_link() {
             "server_port": '${port}',
             "uuid": "'${uuid}'"
         }'
+        print_success "VLESS 解析成功"
+    fi
+}
+
+# 解析 SS2022 链接
+parse_ss_link() {
+    local link="$1"
+    print_info "解析 SS2022 链接..."
+    
+    local data=$(echo "$link" | sed 's/ss:\/\///')
+    local encoded=$(echo "$data" | cut -d'@' -f1)
+    local server_port=$(echo "$data" | cut -d'@' -f2 | cut -d'#' -f1)
+    local server=$(echo "$server_port" | cut -d':' -f1)
+    local port=$(echo "$server_port" | cut -d':' -f2 | cut -d'?' -f1)
+    
+    # 解码 method:password
+    local decoded=$(echo "$encoded" | base64 -d 2>/dev/null)
+    local method=$(echo "$decoded" | cut -d':' -f1)
+    local password=$(echo "$decoded" | cut -d':' -f2-)
+    
+    OUTBOUND_TAG="relay"
+    OUTBOUND_JSON='{
+            "type": "shadowsocks",
+            "tag": "relay",
+            "server": "'${server}'",
+            "server_port": '${port}',
+            "method": "'${method}'",
+            "password": "'${password}'"
+        }'
+    
+    print_success "SS2022 解析成功 (${method})"
+}
+
+# 解析 SOCKS 链接
+parse_socks_link() {
+    local link="$1"
+    print_info "解析 SOCKS 链接..."
+    
+    local data=$(echo "$link" | sed 's|socks5\?://||')
+    
+    if [[ "$data" =~ @ ]]; then
+        # 有认证
+        local userpass=$(echo "$data" | cut -d'@' -f1)
+        local username=$(echo "$userpass" | cut -d':' -f1)
+        local password=$(echo "$userpass" | cut -d':' -f2)
+        local server_port=$(echo "$data" | cut -d'@' -f2)
+        local server=$(echo "$server_port" | cut -d':' -f1)
+        local port=$(echo "$server_port" | cut -d':' -f2)
+        
+        OUTBOUND_JSON='{
+            "type": "socks",
+            "tag": "relay",
+            "server": "'${server}'",
+            "server_port": '${port}',
+            "version": "5",
+            "username": "'${username}'",
+            "password": "'${password}'"
+        }'
+    else
+        # 无认证
+        local server=$(echo "$data" | cut -d':' -f1)
+        local port=$(echo "$data" | cut -d':' -f2)
+        
+        OUTBOUND_JSON='{
+            "type": "socks",
+            "tag": "relay",
+            "server": "'${server}'",
+            "server_port": '${port}',
+            "version": "5"
+        }'
     fi
     
-    print_success "已解析标准 VLESS 配置"
+    OUTBOUND_TAG="relay"
+    print_success "SOCKS 解析成功"
+}
+
+# 解析 HTTP/HTTPS 链接
+parse_http_link() {
+    local link="$1"
+    print_info "解析 HTTP(S) 链接..."
+    
+    local protocol=$(echo "$link" | cut -d':' -f1)
+    local data=$(echo "$link" | sed 's|https\?://||')
+    
+    local tls="false"
+    [ "$protocol" = "https" ] && tls="true"
+    
+    if [[ "$data" =~ @ ]]; then
+        # 有认证
+        local userpass=$(echo "$data" | cut -d'@' -f1)
+        local username=$(echo "$userpass" | cut -d':' -f1)
+        local password=$(echo "$userpass" | cut -d':' -f2)
+        local server_port=$(echo "$data" | cut -d'@' -f2)
+        local server=$(echo "$server_port" | cut -d':' -f1)
+        local port=$(echo "$server_port" | cut -d':' -f2 | cut -d'/' -f1)
+        
+        OUTBOUND_JSON='{
+            "type": "http",
+            "tag": "relay",
+            "server": "'${server}'",
+            "server_port": '${port}',
+            "username": "'${username}'",
+            "password": "'${password}'",
+            "tls": {"enabled": '${tls}'}
+        }'
+    else
+        # 无认证
+        local server=$(echo "$data" | cut -d':' -f1)
+        local port=$(echo "$data" | cut -d':' -f2 | cut -d'/' -f1)
+        
+        OUTBOUND_JSON='{
+            "type": "http",
+            "tag": "relay",
+            "server": "'${server}'",
+            "server_port": '${port}',
+            "tls": {"enabled": '${tls}'}
+        }'
+    fi
+    
+    OUTBOUND_TAG="relay"
+    print_success "HTTP(S) 解析成功"
 }
 
 # 保存配置
@@ -457,7 +580,6 @@ CONF
     
     print_success "配置已生成"
     
-    # 验证配置
     if ! sing-box check -c /etc/sing-box/config.json 2>/dev/null; then
         print_error "配置验证失败"
         cat /etc/sing-box/config.json
@@ -499,6 +621,7 @@ show_result() {
     echo ""
     echo -e "${GREEN}协议:${NC} ${PROTOCOL_NAME}"
     echo -e "${GREEN}端口:${NC} ${PORT}"
+    echo -e "${GREEN}出站:${NC} ${OUTBOUND_TAG}"
     
     if [ -n "$PASSWORD_INFO" ]; then
         echo -e "${GREEN}${PASSWORD_INFO}${NC}"
@@ -516,6 +639,10 @@ show_result() {
     fi
     
     echo ""
+    echo -e "${CYAN}管理命令:${NC}"
+    echo "  systemctl status sing-box   # 状态"
+    echo "  journalctl -u sing-box -f  # 日志"
+    echo ""
     echo -e "${PURPLE}更多工具: https://dlmn.lol${NC}"
     echo ""
 }
@@ -524,7 +651,15 @@ show_result() {
 main_menu() {
     show_banner
     echo ""
-    read -p "选择协议 [1-5]: " choice
+    echo "选择协议:"
+    echo "  1) Reality"
+    echo "  2) Hysteria2"
+    echo "  3) ShadowTLS v3"
+    echo "  4) Reality + gRPC"
+    echo "  5) SOCKS5"
+    echo "  0) 退出"
+    echo ""
+    read -p "选择 [1-5]: " choice
     
     case $choice in
         1) setup_reality ;;
