@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Sing-Box 一键安装配置脚本 v2.4
+# Sing-Box 一键安装配置脚本 v2.5
 # 作者: sd87671067
 # 博客: dlmn.lol
-# 更新时间: 2025-11-09 09:39 UTC
+# 更新时间: 2025-11-10 06:50 UTC
 
 set -e
 
@@ -28,8 +28,8 @@ print_error() { echo -e "${RED}[✗]${NC} $1"; }
 show_banner() {
     clear
     echo -e "${CYAN}╔═══════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║   Sing-Box 一键安装脚本 v2.4                     ║${NC}"
-    echo -e "${CYAN}║   作者: sd87671067 | 博客: dlmn.lol              ║${NC}"
+    echo -e "${CYAN}║   Sing-Box 一键安装配置+中转脚本 v2.5               ║${NC}"
+    echo -e "${CYAN}║   作者: sd87671067 | 博客:   dlmn.lol              ║${NC}"
     echo -e "${CYAN}╚═══════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -150,7 +150,11 @@ setup_reality() {
   }
 }'
     
-    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${REALITY_PUBLIC}&sid=${SHORT_ID}&type=tcp#reality-博客域名:${AUTHOR_BLOG}"
+    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${REALITY_PUBLIC}&sid=${SHORT_ID}&type=tcp#${AUTHOR_BLOG}"
+    
+    # Loon配置格式
+    LINK_LOON="${AUTHOR_BLOG} = VLESS,${SERVER_IP},${PORT},\"${UUID}\",transport=tcp,flow=xtls-rprx-vision,public-key=\"${REALITY_PUBLIC}\",short-id=${SHORT_ID},udp=true,block-quic=true,over-tls=true,sni=${SNI},ip-mode=prefer-v4"
+    
     PROTO="Reality"
     EXTRA_INFO="UUID: ${UUID}\nPublic Key: ${REALITY_PUBLIC}\nShort ID: ${SHORT_ID}\nSNI: ${SNI}"
     print_success "Reality 配置完成"
@@ -180,7 +184,7 @@ setup_hysteria2() {
   }
 }'
     
-    LINK="hysteria2://${HY2_PASSWORD}@${SERVER_IP}:${PORT}?insecure=1&sni=itunes.apple.com#hysteria2-博客域名:${AUTHOR_BLOG}"
+    LINK="hysteria2://${HY2_PASSWORD}@${SERVER_IP}:${PORT}?insecure=1&sni=itunes.apple.com#${AUTHOR_BLOG}"
     PROTO="Hysteria2"
     EXTRA_INFO="密码: ${HY2_PASSWORD}\n证书: 自签证书(itunes.apple.com)"
     print_success "Hysteria2 配置完成"
@@ -204,7 +208,7 @@ setup_socks5() {
   "users": [{"username": "'${SOCKS_USER}'", "password": "'${SOCKS_PASS}'"}],
   "udp": true
 }'
-        LINK="socks5://${SOCKS_USER}:${SOCKS_PASS}@${SERVER_IP}:${PORT}#socks5-博客域名:${AUTHOR_BLOG}"
+        LINK="socks5://${SOCKS_USER}:${SOCKS_PASS}@${SERVER_IP}:${PORT}#${AUTHOR_BLOG}"
         EXTRA_INFO="用户名: ${SOCKS_USER}\n密码: ${SOCKS_PASS}"
     else
         INBOUND_JSON='{
@@ -214,7 +218,7 @@ setup_socks5() {
   "listen_port": '${PORT}',
   "udp": true
 }'
-        LINK="socks5://${SERVER_IP}:${PORT}#socks5-博客域名:${AUTHOR_BLOG}"
+        LINK="socks5://${SERVER_IP}:${PORT}#${AUTHOR_BLOG}"
         EXTRA_INFO="无认证"
     fi
     
@@ -258,7 +262,7 @@ setup_shadowtls() {
     local plugin_json="{\"version\":\"3\",\"host\":\"${SNI}\",\"password\":\"${SHADOWTLS_PASSWORD}\"}"
     local plugin_base64=$(echo -n "$plugin_json" | base64 -w0)
     
-    LINK="ss://${ss_userinfo}@${SERVER_IP}:${PORT}?shadow-tls=${plugin_base64}#shadowtls-博客域名:${AUTHOR_BLOG}"
+    LINK="ss://${ss_userinfo}@${SERVER_IP}:${PORT}?shadow-tls=${plugin_base64}#${AUTHOR_BLOG}"
     
     PROTO="ShadowTLS v3"
     EXTRA_INFO="Shadowsocks方法: 2022-blake3-aes-128-gcm\nShadowsocks密码: ${SS_PASSWORD}\nShadowTLS密码: ${SHADOWTLS_PASSWORD}\n伪装域名: ${SNI}\n\n说明: 可直接复制链接导入 Shadowrocket"
@@ -289,7 +293,7 @@ setup_https() {
   }
 }'
     
-    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=tls&sni=itunes.apple.com&type=tcp&allowInsecure=1#https-博客域名:${AUTHOR_BLOG}"
+    LINK="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=tls&sni=itunes.apple.com&type=tcp&allowInsecure=1#${AUTHOR_BLOG}"
     PROTO="HTTPS"
     EXTRA_INFO="UUID: ${UUID}\n证书: 自签证书(itunes.apple.com)"
     print_success "HTTPS 配置完成"
@@ -305,7 +309,6 @@ setup_anytls() {
     
     print_info "生成证书指纹..."
     CERT_SHA256=$(openssl x509 -fingerprint -noout -sha256 -in ${CERT_DIR}/cert.pem | awk -F '=' '{print $NF}')
-    CERT_BASE64=$(openssl x509 -in ${CERT_DIR}/cert.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
     
     print_info "生成配置文件..."
     
@@ -323,48 +326,40 @@ setup_anytls() {
   }
 }'
     
-    LINK_SHADOWROCKET="anytls://${ANYTLS_PASSWORD}@${SERVER_IP}:${PORT}?udp=1&hpkp=${CERT_SHA256}#anytls-${AUTHOR_BLOG}"
-    LINK_V2RAYN="anytls://${ANYTLS_PASSWORD}@${SERVER_IP}:${PORT}?security=tls&fp=firefox&insecure=1&type=tcp#anytls-${AUTHOR_BLOG}"
-    LINK_NEKO="anytls://${ANYTLS_PASSWORD}@${SERVER_IP}:${PORT}/?insecure=1#anytls-${AUTHOR_BLOG}"
-    LINK_CLASH="- name: anytls-${AUTHOR_BLOG}
-  type: anytls
-  server: ${SERVER_IP}
-  port: ${PORT}
-  password: ${ANYTLS_PASSWORD}
-  client-fingerprint: firefox
-  certificate_pin: \"${CERT_BASE64}\""
-    
-    LINK_SINGBOX='{
-  "type": "anytls",
-  "tag": "anytls-'${AUTHOR_BLOG}'",
-  "server": "'${SERVER_IP}'",
-  "server_port": '${PORT}',
-  "password": "'${ANYTLS_PASSWORD}'",
-  "tls": {
-    "enabled": true,
-    "certificate_public_key_sha256": ["'${CERT_BASE64}'"]
-  }
-}'
+    LINK_SHADOWROCKET="anytls://${ANYTLS_PASSWORD}@${SERVER_IP}:${PORT}?udp=1&hpkp=${CERT_SHA256}#${AUTHOR_BLOG}"
+    LINK_V2RAYN="anytls://${ANYTLS_PASSWORD}@${SERVER_IP}:${PORT}?security=tls&fp=firefox&insecure=1&type=tcp#${AUTHOR_BLOG}"
     
     LINK="${LINK_SHADOWROCKET}"
     PROTO="AnyTLS"
     
-    EXTRA_INFO="密码: ${ANYTLS_PASSWORD}
-证书: 自签证书(itunes.apple.com)
-证书指纹(SHA256): ${CERT_SHA256}
-证书指纹(Base64): ${CERT_BASE64}
-
-✨ 支持的客户端:
-  • Shadowrocket / V2rayN / NekoBox - 直接导入链接
-  • Clash / Clash.Meta - 使用下方YAML配置
-  • Sing-box客户端 - 使用下方JSON配置"
+    EXTRA_INFO="密码: ${ANYTLS_PASSWORD}\n证书: 自签证书(itunes.apple.com)\n证书指纹(SHA256): ${CERT_SHA256}\n\n✨ 支持的客户端:\n  • Shadowrocket / V2rayN - 直接导入链接"
     
-    print_success "AnyTLS 配置完成（已生成多客户端格式）"
+    print_success "AnyTLS 配置完成（已生成Shadowrocket和V2rayN格式）"
 }
 
 parse_socks_link() {
     local link="$1"
+    
+    # 检查是否是 base64 编码格式 (socks://base64)
+    if [[ "$link" =~ ^socks://([A-Za-z0-9+/=]+) ]]; then
+        print_info "检测到 base64 编码的 SOCKS 链接，正在解码..."
+        local base64_part="${BASH_REMATCH[1]}"
+        # 解码 base64
+        local decoded=$(echo "$base64_part" | base64 -d 2>/dev/null)
+        if [[ -z "$decoded" ]]; then
+            print_error "base64 解码失败"
+            RELAY_JSON=''
+            OUTBOUND_TAG="direct"
+            return
+        fi
+        # 解码后格式: username:password@server:port
+        link="socks5://${decoded}"
+    fi
+    
+    # 移除 socks:// 或 socks5:// 前缀
     local data=$(echo "$link" | sed 's|socks5\?://||')
+    # 移除 URL 参数
+    data=$(echo "$data" | cut -d'?' -f1)
     
     if [[ "$data" =~ @ ]]; then
         local userpass=$(echo "$data" | cut -d'@' -f1)
@@ -460,6 +455,7 @@ setup_relay() {
     echo -e "  ${GREEN}SOCKS5:${NC}"
     echo -e "    socks5://user:pass@server:port"
     echo -e "    socks5://server:port"
+    echo -e "    socks://base64编码"
     echo ""
     echo -e "  ${GREEN}HTTP/HTTPS:${NC}"
     echo -e "    http://user:pass@server:port"
@@ -474,7 +470,7 @@ setup_relay() {
         return
     fi
     
-    if [[ "$RELAY_LINK" =~ ^socks5? ]]; then
+    if [[ "$RELAY_LINK" =~ ^socks ]]; then
         parse_socks_link "$RELAY_LINK"
     elif [[ "$RELAY_LINK" =~ ^https? ]]; then
         parse_http_link "$RELAY_LINK"
@@ -490,14 +486,14 @@ show_menu() {
     show_banner
     echo -e "${YELLOW}请选择协议:${NC}"
     echo ""
-    echo -e "${GREEN}[1]${NC} Reality ${YELLOW}(⭐ 强烈推荐)${NC}"
+    echo -e "${GREEN}[1]${NC} VlessReality ${YELLOW}(⭐ 强烈推荐)${NC}"
     echo -e "    ${CYAN}→ 抗审查最强，伪装真实TLS，无需证书${NC}"
     echo ""
     echo -e "${GREEN}[2]${NC} Hysteria2"
-    echo -e "    ${CYAN}→ 基于QUIC，速度快，适合高延迟网络${NC}"
+    echo -e "    ${CYAN}→ 基于QUIC，速度快，垃圾线路专用，适合高延迟网络${NC}"
     echo ""
     echo -e "${GREEN}[3]${NC} SOCKS5"
-    echo -e "    ${CYAN}→ 通用代理协议，兼容性最好${NC}"
+    echo -e "    ${CYAN}→ 适合中转的代理协议，只能在落地机上用${NC}"
     echo ""
     echo -e "${GREEN}[4]${NC} ShadowTLS v3"
     echo -e "    ${CYAN}→ TLS流量伪装，支持 Shadowrocket${NC}"
@@ -505,7 +501,7 @@ show_menu() {
     echo -e "${GREEN}[5]${NC} HTTPS"
     echo -e "    ${CYAN}→ 标准HTTPS，可过CDN${NC}"
     echo ""
-    echo -e "${GREEN}[6]${NC} AnyTLS ${YELLOW}(✨ 已优化)${NC}"
+    echo -e "${GREEN}[6]${NC} AnyTLS ${YELLOW}"
     echo -e "    ${CYAN}→ 通用TLS协议，支持多客户端自动配置${NC}"
     echo ""
     read -p "选择 [1-6]: " choice
@@ -594,7 +590,7 @@ show_result() {
     echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
     
     if [[ "$PROTO" == "AnyTLS" ]]; then
-        echo -e "${GREEN}📋 Shadowrocket / V2rayN / NekoBox 剪贴板链接:${NC}"
+        echo -e "${GREEN}📋 Shadowrocket 剪贴板链接:${NC}"
         echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
         echo ""
         echo -e "${YELLOW}${LINK}${NC}"
@@ -602,7 +598,7 @@ show_result() {
         
         if command -v qrencode &>/dev/null; then
             echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-            echo -e "${GREEN}📱 二维码 (Shadowrocket/V2rayN/NekoBox):${NC}"
+            echo -e "${GREEN}📱 二维码 (Shadowrocket):${NC}"
             echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
             echo ""
             qrencode -t ANSIUTF8 -s 1 -m 1 "${LINK}"
@@ -615,28 +611,29 @@ show_result() {
         echo ""
         echo -e "${YELLOW}${LINK_V2RAYN}${NC}"
         echo ""
-        
-        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-        echo -e "${GREEN}📋 NekoBox 专用链接:${NC}"
-        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-        echo ""
-        echo -e "${YELLOW}${LINK_NEKO}${NC}"
-        echo ""
-        
-        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-        echo -e "${GREEN}📋 Clash / Clash.Meta 配置 (YAML):${NC}"
+    
+    elif [[ "$PROTO" == "Reality" ]]; then
+        echo -e "${GREEN}📋 剪贴板链接:${NC}"
         echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
         echo ""
-        echo -e "${YELLOW}${LINK_CLASH}${NC}"
+        echo -e "${YELLOW}${LINK}${NC}"
         echo ""
         
-        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-        echo -e "${GREEN}📋 Sing-box 客户端配置 (JSON):${NC}"
-        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
-        echo ""
-        echo -e "${YELLOW}${LINK_SINGBOX}${NC}"
-        echo ""
+        if command -v qrencode &>/dev/null; then
+            echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
+            echo -e "${GREEN}📱 二维码:${NC}"
+            echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
+            echo ""
+            qrencode -t ANSIUTF8 -s 1 -m 1 "${LINK}"
+            echo ""
+        fi
         
+        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
+        echo -e "${GREEN}📋 Loon iOS 配置:${NC}"
+        echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
+        echo ""
+        echo -e "${YELLOW}${LINK_LOON}${NC}"
+        echo ""
     else
         echo -e "${GREEN}📋 剪贴板链接:${NC}"
         echo -e "${CYAN}───────────────────────────────────────────────────────${NC}"
@@ -658,17 +655,18 @@ show_result() {
     echo ""
     echo -e "${YELLOW}📱 使用方法:${NC}"
     if [[ "$PROTO" == "AnyTLS" ]]; then
-        echo -e "  ${GREEN}通用客户端 (Shadowrocket/V2rayN/NekoBox):${NC}"
+        echo -e "  ${GREEN}Shadowrocket / V2rayN:${NC}"
         echo -e "    1. 复制对应客户端的链接"
         echo -e "    2. 打开客户端，从剪贴板导入"
+    elif [[ "$PROTO" == "Reality" ]]; then
+        echo -e "  ${GREEN}通用客户端:${NC}"
+        echo -e "    1. 复制链接或扫描二维码"
+        echo -e "    2. 打开客户端导入配置"
         echo ""
-        echo -e "  ${GREEN}Clash / Clash.Meta:${NC}"
-        echo -e "    1. 复制上方 YAML 配置"
-        echo -e "    2. 添加到配置文件的 proxies 部分"
-        echo ""
-        echo -e "  ${GREEN}Sing-box 客户端:${NC}"
-        echo -e "    1. 复制上方 JSON 配置"
-        echo -e "    2. 添加到配置文件的 outbounds 部分"
+        echo -e "  ${GREEN}Loon (iOS):${NC}"
+        echo -e "    1. 复制上方 Loon 配置"
+        echo -e "    2. 粘贴到 Loon配置文件中 的 [Proxy] 部分"
+        echo -e "    3. 或者从vless开始复制，然后添加节点，从剪贴板导入"
     else
         echo -e "  1. 复制上面的链接或扫描二维码"
         echo -e "  2. 打开客户端导入配置"
